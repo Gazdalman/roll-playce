@@ -38,14 +38,14 @@ func RegisterUser(username, email, password, firstName, lastName, bio, profilePi
 	}
 
 	user := &User{
-		username:       username,
-		email:          email,
-		hashedPassword: hashedPassword,
-		firstName:      firstName,
-		lastName:       lastName,
-		bio:            bio,
-		profilePic:     profilePic,
-		private:        private,
+		Username:       username,
+		Email:          email,
+		HashedPassword: hashedPassword,
+		FirstName:      firstName,
+		LastName:       lastName,
+		Bio:            bio,
+		ProfilePic:     profilePic,
+		Private:        private,
 	}
 
 	// Save the user to the database
@@ -57,17 +57,23 @@ func RegisterUser(username, email, password, firstName, lastName, bio, profilePi
 }
 
 // LoginUser checks the user credentials and returns the user object if valid
-func LoginUser(username, password string) (*User, error) {
+func LoginUser(credential, password string) (*User, error) {
 	// Retrieve the user by username
-	user, err := GetUserByUsernameOrEmail(username)
+	user, err := GetUserByUsernameOrEmail(credential)
 	if err != nil {
 		return nil, errors.New("user not found")
 	}
 
 	// Compare the provided password with the stored hashed password
-	if !ComparePasswords(user.hashedPassword, password) {
+	if !ComparePasswords(user.HashedPassword, password) {
 		return nil, errors.New("invalid password")
 	}
 
 	return user, nil
+}
+
+// UploadProfilePic uploads a profile picture to AWS S3
+func UploadProfilePic(userID, profilePic string) error {
+	// Implement the function to upload the profile picture to AWS S3
+	return nil
 }

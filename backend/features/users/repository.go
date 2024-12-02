@@ -16,7 +16,7 @@ func GetAllUsers() ([]User, error) {
 func GetUserByUsernameOrEmail(credential string) (*User, error) {
 	var user User
 	// Try to find the user by username first, if not found, try email
-	if err := config.DB.Where("username = ? OR email = ?", credential, credential).First(&user).Error; err != nil {
+	if err := config.DB.Where("Username = ? OR Email = ?", credential, credential).First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil

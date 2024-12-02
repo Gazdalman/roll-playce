@@ -1,8 +1,11 @@
 package users
 
 import (
-	"github.com/gin-gonic/gin"
+	"fmt"
+	"gin-backend/middleware"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 // RegisterHandler handles the user registration request
@@ -24,6 +27,8 @@ func RegisterHandler(c *gin.Context) {
 		return
 	}
 
+	
+
 	// Call the service to register the user
 	user, err := RegisterUser(requestData.Username, requestData.Email, requestData.Password, requestData.FirstName, requestData.LastName, requestData.Bio, requestData.ProfilePic, requestData.Private)
 	if err != nil {
@@ -35,10 +40,10 @@ func RegisterHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "User registered successfully",
 		"user": gin.H{
-			"username":   user.username,
-			"email":      user.email,
-			"first_name": user.firstName,
-			"last_name":  user.lastName,
+			"username":   user.Username,
+			"email":      user.Email,
+			"first_name": user.FirstName,
+			"last_name":  user.LastName,
 		},
 	})
 }
@@ -46,7 +51,7 @@ func RegisterHandler(c *gin.Context) {
 // LoginHandler handles the user login request
 func LoginHandler(c *gin.Context) {
 	var requestData struct {
-		Username string `json:"username"`
+		Credential string `json:"credential"`
 		Password string `json:"password"`
 	}
 
@@ -57,21 +62,38 @@ func LoginHandler(c *gin.Context) {
 	}
 
 	// Call the service to authenticate the user
-	user, err := LoginUser(requestData.Username, requestData.Password)
+	user, err := LoginUser(requestData.Credential, requestData.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
+	// Generate a JWT token
+	token, err := middleware.GenerateJWT(fmt.Sprintf("%d", user.ID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating token"})
+		return
+	}
+
+	// Set the token in the response header
+	c.Header("Authorization", "Bearer "+token)
+
+	// Add JWT token to cookies
+	c.SetCookie("token", token, 60*60*24, "/", "localhost", false, true)
+
+	// Set the user in the context
+	c.Set("user", user)
+
 	// Return the authenticated user (without the password)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
 		"user": gin.H{
-			"username":   user.username,
-			"email":      user.email,
-			"first_name": user.firstName,
-			"last_name":  user.lastName,
+			"username":   user.Username,
+			"email":      user.Email,
+			"first_name": user.FirstName,
+			"last_name":  user.LastName,
 		},
+		"token": token,
 	})
 }
 
@@ -87,12 +109,12 @@ func GetUserHandler(c *gin.Context) {
 		return
 	}
 
-	if user.private {
+	if user.Private {
 		// Send only the bio, profilePic, and username
 		c.JSON(http.StatusOK, gin.H{
-			"bio":        user.bio,
-			"profilePic": user.profilePic,
-			"username":   user.username,
+			"bio":        user.Bio,
+			"profilePic": user.ProfilePic,
+			"username":   user.Username,
 		})
 		return
 	}
@@ -102,5 +124,27 @@ func GetUserHandler(c *gin.Context) {
 }
 
 func ProfileHandler(c *gin.Context) {
-	
+	userID, _ := c.Get("user") // Get the user ID from the context
+
+	// Find the user by ID
+	user, err := GetUserByID(fmt.Sprintf("%v", userID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"message": "User not found",
+		})
+		return
+	}
+
+	user = &User{
+		Username:   user.Username,
+		Email:      user.Email,
+		FirstName:  user.FirstName,
+		LastName:   user.LastName,
+		Bio:        user.Bio,
+		ProfilePic: user.ProfilePic,
+		Private:    user.Private,
+	}
+
+	// Return the user as a JSON response
+	c.JSON(http.StatusOK, user)
 }
