@@ -26,7 +26,10 @@ func ComparePasswords(hashedPassword, plainPassword string) bool {
 	return true
 }
 
-func RegisterUser(username, email, password, firstName, lastName, bio string, private bool) (*User, error) {
+func RegisterUser(username, email, password, firstName, lastName, bio, profilePic string, private bool) (*User, error) {
+	log.Println("Registering user:", username)
+	log.Println("email:", email)
+	log.Println("password:", password)
 	if username == "" || email == "" || password == "" {
 		return nil, errors.New("all fields are required")
 	}
@@ -44,7 +47,7 @@ func RegisterUser(username, email, password, firstName, lastName, bio string, pr
 		FirstName:      firstName,
 		LastName:       lastName,
 		Bio:            bio,
-		// ProfilePic:     profilePic,
+		ProfilePic:     profilePic,
 		Private:        private,
 	}
 

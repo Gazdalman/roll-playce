@@ -2,7 +2,9 @@ package users
 
 import (
 	"fmt"
+	"gin-backend/config"
 	"gin-backend/middleware"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -17,40 +19,54 @@ func RegisterHandler(c *gin.Context) {
 		FirstName  string `form:"first_name"`
 		LastName   string `form:"last_name"`
 		Bio        string `form:"bio"`
-		ProfilePic string `form:"profile_pic"`
 		Private    bool   `form:"private"`
 	}
 
-	// Bind JSON request body to the struct
-	if err := c.ShouldBindJSON(&requestData); err != nil {
+	// Bind form data to the struct
+	if err := c.ShouldBind(&requestData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
 
-	// Upl
+	var profilePicURL string
+	file, header, err := c.Request.FormFile("profile_pic") // "profile_pic" is the form field name
+	if err == nil && header != nil { // If a file is provided
+		defer file.Close()
+
+		// Upload the file to S3 (or your storage solution)
+		profilePicURL, err = config.UploadFile(file, header.Filename)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			log.Println("Error registering user:", err)
+			return
+		}
+	} else {
+		// If no file provided, set a default profile picture
+		profilePicURL = "https://rollplayce.s3.us-east-2.amazonaws.com/default-avatar-icon-of-social-media-user-vector.jpg"
+	}
 
 	// Call the service to register the user
-	user, err := RegisterUser(requestData.Username, requestData.Email, requestData.Password, requestData.FirstName, requestData.LastName, requestData.Bio, requestData.Private)
+	user, err := RegisterUser(requestData.Username, requestData.Email, requestData.Password, requestData.FirstName, requestData.LastName, requestData.Bio, profilePicURL, requestData.Private)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-		// Generate a JWT token
-		token, err := middleware.GenerateJWT(fmt.Sprintf("%d", user.ID))
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating token"})
-			return
-		}
+	// Generate a JWT token
+	token, err := middleware.GenerateJWT(fmt.Sprintf("%d", user.ID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating token"})
+		return
+	}
 
-		// Set the token in the response header
-		c.Header("Authorization", "Bearer "+token)
+	// Set the token in the response header
+	c.Header("Authorization", "Bearer "+token)
 
-		// Add JWT token to cookies
-		c.SetCookie("token", token, 60*60*24, "/", "localhost", false, true)
+	// Add JWT token to cookies
+	c.SetCookie("token", token, 60*60*24, "/", "localhost", false, true)
 
-		// Set the user in the context
-		c.Set("user", user)
+	// Set the user in the context
+	c.Set("user", user)
 
 	// Return the created user (without the password)
 	c.JSON(http.StatusOK, gin.H{
@@ -68,7 +84,7 @@ func RegisterHandler(c *gin.Context) {
 func LoginHandler(c *gin.Context) {
 	var requestData struct {
 		Credential string `json:"credential"`
-		Password string `json:"password"`
+		Password   string `json:"password"`
 	}
 
 	// Bind JSON request body to the struct
